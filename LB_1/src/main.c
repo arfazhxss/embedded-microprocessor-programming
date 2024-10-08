@@ -1,4 +1,4 @@
-//
+
 // This file is part of the GNU ARM Eclipse distribution.
 // Copyright (c) 2014 Liviu Ionescu.
 //
@@ -6,7 +6,6 @@
 // ----------------------------------------------------------------------------
 // School: University of Victoria, Canada.
 // Course: CENG 355 "Microprocessor-Based Systems".
-// This is template code for Part 2 of Introductory Lab.
 //
 // See "system/include/cmsis/stm32f0xx.h" for register/bit definitions.
 // See "system/src/cmsis/vectors_stm32f0xx.c" for handler declarations.
@@ -42,37 +41,49 @@
 /* Maximum possible setting for overflow */
 #define myTIM2_PERIOD ((uint32_t)0xFFFFFFFF)
 
+//Initialization Functions
+
 void myGPIOA_Init(void);
 void myTIM2_Init(void);
 void myEXTI_Init(void);
 
-// Your global variables...
+//Global variables
+unsigned int edgecounter = 0;
 
-int main(int argc, char* argv[])
-{
+float frequency = 0;
+float resistance = 0;
+float Period = 1;
 
-	trace_printf("This is Part 2 of Introductory Lab...\n");
+int main(int argc, char* argv[]) {
+
+	trace_printf("This is the Final Project for CENG 355 Lab.\n");
 	trace_printf("System clock: %u Hz\n", SystemCoreClock);
 
 	myGPIOA_Init();		/* Initialize I/O port PA */
 	myTIM2_Init();		/* Initialize timer TIM2 */
 	myEXTI_Init();		/* Initialize EXTI */
 
-	while (1)
-	{
-		// Nothing is going on here...
-	}
+
+	while (1) {}
 
 	return 0;
 
 }
 
+// ----- SECTION I: GENERAL INITIALIZATION: GPIOA - ADC/DAC - EXTI -----
 
 void myGPIOA_Init()
 {
 	/* Enable clock for GPIOA peripheral */
 	// Relevant register: RCC->AHBENR
 	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
+
+	//enables peripheral clock for ADC
+	RCC->APB2ENR |= RCC_APB2ENR_ADCEN;
+
+	//Enable PA0 as ADC input
+	GPIOA->MODER &= ~(GPIO_MODER_MODER0);
+	GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR0);
 
 	/* Configure PA1 as input */
 	// Relevant register: GPIOA->MODER
@@ -81,8 +92,41 @@ void myGPIOA_Init()
 	/* Ensure no pull-up/pull-down for PA1 */
 	// Relevant register: GPIOA->PUPDR
 	GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR1);
+
+	// GPIOA->MODER &= (GPIO_MODER_MODER4); gives JTAG failure
+	//Enable PA4 as DAC output
+	GPIOA->MODER &= ~(GPIO_MODER_MODER4);
+	GPIOA->MODER &= ~(GPIO_MODER_MODER4);
+
 }
 
+void myEXTI_Init()
+{
+	/* Map EXTI1 line to PA1 */
+	// Relevant register: SYSCFG->EXTICR[0]
+	SYSCFG->EXTICR[0] &= 0x0000FF0F;
+
+	/* EXTI1 line interrupts: set rising-edge trigger */
+	// Relevant register: EXTI->RTSR
+	EXTI->RTSR |= EXTI_RTSR_TR1;
+
+	/* Unmask interrupts from EXTI1 line */
+	// Relevant register: EXTI->IMR
+	EXTI->IMR |= EXTI_IMR_MR1;
+
+	/* Assign EXTI1 interrupt priority = 0 in NVIC */
+	// Relevant register: NVIC->IP[1], or use NVIC_SetPriority
+	NVIC_SetPriority(EXTI0_1_IRQn, 0);
+
+	/* Enable EXTI1 interrupts in NVIC */
+	// Relevant register: NVIC->ISER[0], or use NVIC_EnableIRQ
+	NVIC_EnableIRQ(EXTI0_1_IRQn);
+
+}
+
+
+
+// ----- SECTION II: TIMER INITIALIZATION AND DELAY FUNCTION -----
 
 void myTIM2_Init()
 {
@@ -102,43 +146,22 @@ void myTIM2_Init()
 
 	/* Update timer registers */
 	// Relevant register: TIM2->EGR
-	TIM2->EGR = ((uint16_t)0x0001);
+	TIM2->EGR |= ((uint16_t)0x0001);
 
 	/* Assign TIM2 interrupt priority = 0 in NVIC */
 	// Relevant register: NVIC->IP[3], or use NVIC_SetPriority
 	NVIC_SetPriority(TIM2_IRQn, 0);
+	// Same as: NVIC->IP[3] = ((uint32_t)0x00FFFFFF);
 
 	/* Enable TIM2 interrupts in NVIC */
 	// Relevant register: NVIC->ISER[0], or use NVIC_EnableIRQ
 	NVIC_EnableIRQ(TIM2_IRQn);
+	// Same as: NVIC->ISER[0] = ((uint32_t)0x00008000) */
 
 	/* Enable update interrupt generation */
-	// Relevant register: TIM2->DIER
 	TIM2->DIER |= TIM_DIER_UIE;
-}
-
-
-void myEXTI_Init()
-{
-	/* Map EXTI1 line to PA1 */
-	// Relevant register: SYSCFG->EXTICR[0]
-	SYSCFG->EXTICR[0] = SYSCFG_EXTICR1_EXTI1_PA;
-
-	/* EXTI1 line interrupts: set rising-edge trigger */
-	// Relevant register: EXTI->RTSR
-	EXTI->RTSR |= EXTI_RTSR_TR1;
-
-	/* Unmask interrupts from EXTI1 line */
-	// Relevant register: EXTI->IMR
-	EXTI->IMR |= EXTI_IMR_MR1;
-
-	/* Assign EXTI1 interrupt priority = 0 in NVIC */
-	// Relevant register: NVIC->IP[1], or use NVIC_SetPriority
-	NVIC_SetPriority(EXTI0_1_IRQn, 0);
-
-	/* Enable EXTI1 interrupts in NVIC */
-	// Relevant register: NVIC->ISER[0], or use NVIC_EnableIRQ
-	NVIC_EnableIRQ(EXTI0_1_IRQn);
+	// Relevant register: TIM2->DIER
+	TIM2->CR1 |= TIM_CR1_CEN;
 }
 
 
@@ -160,52 +183,47 @@ void TIM2_IRQHandler()
 	}
 }
 
-
 /* This handler is declared in system/src/cmsis/vectors_stm32f0xx.c */
 void EXTI0_1_IRQHandler()
 {
 	// Your local variables...
+	unsigned int elapsedtime = 0;
 
 	/* Check if EXTI1 interrupt pending flag is indeed set */
 	if ((EXTI->PR & EXTI_PR_PR1) != 0)
 	{
-		//
-		// 1. If this is the first edge:
-		//	- Clear count register (TIM2->CNT).
-		//	- Start timer (TIM2->CR1).
-		//    Else (this is the second edge):
 		//	- Stop timer (TIM2->CR1).
-		//	- Read out count register (TIM2->CNT).
-		//	- Calculate signal period and frequency.
-		//	- Print calculated values to the console.
-		//	  NOTE: Function trace_printf does not work
-		//	  with floating-point numbers: you must use
-		//	  "unsigned int" type to print your signal
-		//	  period and frequency.
-		//
-		// 2. Clear EXTI1 interrupt pending flag (EXTI->PR).
-		//
-
-		uint16_t isTimerEnabled = (TIM2->CR1 & TIM_CR1_CEN);
-
-		if (isTimerEnabled) {
-			// stop timer and get count
-			TIM2->CR1 &= ~(TIM_CR1_CEN);
-			uint32_t count = TIM2->CNT;
-			float sigFreq = ((float)SystemCoreClock) / count;
-			float sigPeriod = 1 / sigFreq;
-
-			trace_printf("Signal Freq:   %f Hz\n", sigFreq);
-			trace_printf("Signal Period: %f s\n\n", sigPeriod);
-
-		} else {
-			// reset & start timer
-			TIM2->CNT = (uint32_t)0x0;
+		TIM2->CR1 = ((uint16_t)0x0000);
+		// 1. If this is the first edge:
+		if(edgecounter == 0){
+			//	- Clear count register (TIM2->CNT)
+			TIM2->CNT = 0x00000000; //might need to uint32_t = 0
+			//	- Start timer (TIM2->CR1).
 			TIM2->CR1 |= TIM_CR1_CEN;
+			edgecounter++;
 		}
-
-		// clear EXTI flag
-		EXTI->PR |= EXTI_PR_PR1;
+		//	  Else (this is the second edge):
+		else{
+			//	- Stop timer (TIM2->CR1).
+//			TIM2->CR1 = ((uint16_t)0x0000);
+			TIM2->CR1 &= ~(TIM_CR1_CEN);
+			//	- Read out count register (TIM2->CNT).
+			elapsedtime = TIM2->CNT;
+			//	- Calculate signal period and frequency.
+			frequency = (double)SystemCoreClock/(double)elapsedtime;
+			Period = (double)elapsedtime/(double)SystemCoreClock;
+			//	- Print calculated values to the console.
+			//	  NOTE: Function trace_printf does not work
+			//	  with floating-point numbers: you must use
+			//	  "unsigned int" type to print your signal
+			//	  period and frequency.
+			trace_printf("The Signal frequency is %u Hz. \n", (unsigned int)frequency);
+			trace_printf("The Signal Period: %u s\n\n", (unsigned int)Period);
+			edgecounter = 0;
+		}
+		// 2. Clear EXTI1 interrupt pending flag (EXTI->PR).
+		EXTI->PR = EXTI_PR_PR1;
+		//
 	}
 }
 

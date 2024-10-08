@@ -143,12 +143,6 @@ void PWM_struct_init(volatile PWM_Typedef* self);
 void myGPIOA_Init(void);
 void myTIM2_Init(void);
 void myEXTI_Init(void);
-void myADC_Init(void);
-void myDAC_Init(void);
-uint32_t readADC(void);
-uint32_t toOhms(uint32_t adc_val);
-DAC_Data_Typedef toDacVal(uint32_t adc_val);
-void writeDAC(uint32_t dac_val);
 
 // ----------------------------------------------------------------------------
 //                                 GLOBALS
